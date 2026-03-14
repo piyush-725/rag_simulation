@@ -3,266 +3,250 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive RAG Simulator</title>
+    <title>Professional RAG Flow Simulator</title>
     <style>
         :root {
-            --primary: #4f46e5;
-            --secondary: #ec4899;
-            --bg: #f8fafc;
-            --card: #ffffff;
-            --text: #1e293b;
-            --border: #e2e8f0;
+            --primary: #2563eb;
+            --secondary: #7c3aed;
+            --accent: #06b6d4;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f1f5f9;
+            --border: #334155;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Inter', system-ui, sans-serif;
             background-color: var(--bg);
             color: var(--text);
-            line-height: 1.6;
             margin: 0;
-            padding: 20px;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         .container {
-            max-width: 1000px;
-            margin: 0 auto;
+            max-width: 1100px;
+            width: 100%;
         }
 
-        header {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-
-        h1 { color: var(--primary); margin-bottom: 10px; }
-        p.subtitle { color: #64748b; }
-
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
+        header { text-align: center; margin-bottom: 3rem; }
+        h1 { font-size: 2.5rem; background: linear-gradient(to right, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.5rem; }
+        
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
 
         .card {
             background: var(--card);
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
             border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
         }
 
-        h2 { font-size: 1.2rem; margin-top: 0; display: flex; align-items: center; gap: 10px; }
-        
-        textarea {
-            width: 100%;
-            height: 100px;
-            padding: 12px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            resize: none;
-            box-sizing: border-box;
-            font-family: inherit;
+        .step-tag {
+            background: var(--primary);
+            font-size: 0.75rem;
+            padding: 4px 12px;
+            border-radius: 99px;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 0.05em;
         }
 
-        input[type="text"] {
+        textarea, input {
             width: 100%;
-            padding: 12px;
+            background: #0f172a;
             border: 1px solid var(--border);
+            color: white;
+            padding: 1rem;
             border-radius: 8px;
+            margin-top: 1rem;
             box-sizing: border-box;
+            font-size: 0.9rem;
         }
 
         button {
-            margin-top: 10px;
+            width: 100%;
+            margin-top: 1rem;
+            padding: 0.8rem;
+            border-radius: 8px;
+            border: none;
             background: var(--primary);
             color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
             font-weight: 600;
-            transition: opacity 0.2s;
+            cursor: pointer;
+            transition: all 0.2s;
         }
 
-        button:hover { opacity: 0.9; }
+        button:hover { background: #1d4ed8; transform: translateY(-1px); }
 
-        .chunk-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .chunk {
-            background: #f1f5f9;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            border-left: 4px solid var(--primary);
-            width: 100%;
-        }
-
-        .vector-tag {
-            font-family: monospace;
-            color: var(--secondary);
-            font-size: 0.75rem;
-            display: block;
-            margin-top: 4px;
-        }
-
-        .status-badge {
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            padding: 2px 6px;
-            background: #dcfce7;
-            color: #166534;
-            border-radius: 4px;
-            font-weight: bold;
-        }
-
-        .highlight {
-            border: 2px solid var(--secondary) !important;
-            background: #fdf2f8 !important;
-        }
-
-        #final-prompt-box {
-            white-space: pre-wrap;
-            background: #1e293b;
-            color: #e2e8f0;
-            padding: 15px;
+        /* The Visualizer List */
+        .visualizer {
+            margin-top: 1.5rem;
+            max-height: 300px;
+            overflow-y: auto;
             border-radius: 8px;
-            font-size: 0.9rem;
-            margin-top: 15px;
+            background: #0f172a;
+            padding: 10px;
         }
 
-        .step-label {
-            font-weight: bold;
-            color: var(--secondary);
-            margin-bottom: 5px;
-            display: block;
+        .chunk-box {
+            background: var(--card);
+            border-left: 4px solid var(--accent);
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+            transition: all 0.3s;
         }
+
+        .active-chunk {
+            border-color: #fbbf24;
+            background: #334155;
+            transform: scale(1.02);
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.3);
+        }
+
+        .vector-visual {
+            display: flex;
+            gap: 2px;
+            margin-top: 5px;
+        }
+
+        .v-bar { height: 8px; background: var(--accent); border-radius: 2px; }
+
+        .prompt-preview {
+            background: #000;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: #10b981;
+            margin-top: 1rem;
+            border: 1px dashed #10b981;
+        }
+
+        .hidden { display: none; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <header>
-        <h1>RAG Simulator</h1>
-        <p class="subtitle">Understand Retrieval, Augmentation, and Generation interactively.</p>
+        <h1>RAG Architecture Lab</h1>
+        <p>Follow the flow from Raw Data to AI-Generated Response</p>
     </header>
 
     <div class="grid">
         <div class="card">
-            <h2>1. Data & Chunking</h2>
-            <p style="font-size: 0.85rem; color: #64748b;">Enter text to simulate "PDF/Website" ingestion.</p>
-            <textarea id="dataInput">The Golden Retriever is a sturdy, muscular dog of medium size. They are famous for the dense, lustrous coat of gold that gives the breed its name. Labrador Retrievers are friendly, active, and outgoing. They have more than enough affection to go around for a family looking for a medium-to-large dog.</textarea>
-            <button onclick="processData()">Chunk & Vectorize</button>
+            <span class="step-tag">Phase 1: Knowledge Base</span>
+            <h2 style="margin-top: 1rem;">1. Retrieval Setup</h2>
+            <p style="color: #94a3b8; font-size: 0.9rem;">Input your "Private Data" (PDF content, Website text). This is what the AI doesn't know yet.</p>
             
-            <div id="chunkDisplay" class="chunk-container">
-                </div>
+            <textarea id="sourceData" rows="6">The project 'Alpha' was launched in 2024 to study Mars. 
+The team lead is Sarah Jenkins. 
+Project Alpha utilizes a budget of 2 billion dollars. 
+The launch site was Cape Canaveral.</textarea>
+            
+            <button onclick="processIngestion()">Chunk & Vectorize</button>
+
+            <div class="visualizer" id="vectorStore">
+                <p style="text-align:center; color: #64748b; font-size: 0.8rem;">Vector Database Empty</p>
+            </div>
         </div>
 
         <div class="card">
-            <h2>2. Retrieval (Query)</h2>
-            <p style="font-size: 0.85rem; color: #64748b;">Ask a question to see "Vector Distance" in action.</p>
-            <input type="text" id="queryInput" placeholder="e.g. Tell me about Golden Retrievers">
-            <button onclick="runQuery()" style="background: var(--secondary);">Search Vector DB</button>
+            <span class="step-tag" style="background: var(--secondary);">Phase 2: Execution</span>
+            <h2 style="margin-top: 1rem;">2. Generation Flow</h2>
+            
+            <input type="text" id="userQuery" placeholder="Ask something about Project Alpha...">
+            <button onclick="simulateRAG()" style="background: var(--secondary);">Run RAG Pipeline</button>
 
-            <div id="retrievalInfo" style="margin-top: 20px; display: none;">
-                <span class="step-label">Step: Retrieval</span>
-                <p id="distanceMetric" style="font-size: 0.85rem;"></p>
-                
-                <span class="step-label">Step: Augmentation (The Prompt)</span>
-                <div id="final-prompt-box"></div>
+            <div id="resultsArea" class="hidden">
+                <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 1.5rem;">[AUGMENTATION STEP] The Prompt sent to LLM:</p>
+                <div id="promptOutput" class="prompt-preview"></div>
 
-                <span class="step-label" style="margin-top: 15px;">Step: Generation (Simulated)</span>
-                <p id="llmResponse" style="font-style: italic; color: var(--primary); font-weight: 500;"></p>
+                <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 1rem;">[GENERATION STEP] AI Response:</p>
+                <div id="aiResponse" style="padding: 1rem; background: #1e293b; border-radius: 8px; color: #60a5fa; font-weight: 500;"></div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    let chunks = [];
+    let vectorDatabase = [];
 
-    // Simple "Vector" simulator: Returns a set of keywords as a proxy for a vector
-    function getSimulatedVector(text) {
-        return Array.from({length: 4}, () => (Math.random()).toFixed(2));
-    }
+    function processIngestion() {
+        const text = document.getElementById('sourceData').value;
+        const store = document.getElementById('vectorStore');
+        store.innerHTML = '';
+        vectorDatabase = [];
 
-    function processData() {
-        const text = document.getElementById('dataInput').value;
-        const chunkDisplay = document.getElementById('chunkDisplay');
-        chunkDisplay.innerHTML = '';
-        chunks = [];
+        // 1. Chunking Step
+        const lines = text.split('\n').filter(l => l.trim() !== '');
 
-        // Simple Chunking: Split by sentences
-        const sentenceArray = text.split(/[.!?]/).filter(s => s.trim().length > 0);
+        lines.forEach((line, i) => {
+            // 2. Mock Vectorization (Numerical representation)
+            const mockVector = Array.from({length: 8}, () => Math.floor(Math.random() * 100));
+            
+            const chunk = { id: i, text: line, vector: mockVector };
+            vectorDatabase.push(chunk);
 
-        sentenceArray.forEach((s, index) => {
-            const vector = getSimulatedVector(s);
-            const chunkObj = {
-                id: index,
-                text: s.trim() + '.',
-                vector: vector
-            };
-            chunks.push(chunkObj);
-
+            // UI Update
             const div = document.createElement('div');
-            div.className = 'chunk';
-            div.id = `chunk-${index}`;
-            div.innerHTML = `
-                <strong>Chunk ${index + 1}:</strong> ${chunkObj.text}
-                <span class="vector-tag">Vector: [${vector.join(', ')}]</span>
-            `;
-            chunkDisplay.appendChild(div);
+            div.className = 'chunk-box';
+            div.id = `chunk-${i}`;
+            
+            let vectorHTML = '<div class="vector-visual">';
+            mockVector.forEach(v => {
+                vectorHTML += `<div class="v-bar" style="width: ${v/2}px; opacity: ${v/100}"></div>`;
+            });
+            vectorHTML += '</div>';
+
+            div.innerHTML = `<strong>Chunk ${i+1}:</strong> ${line} ${vectorHTML}`;
+            store.appendChild(div);
         });
     }
 
-    function runQuery() {
-        const query = document.getElementById('queryInput').value;
-        if (!query || chunks.length === 0) {
-            alert("Please add data and enter a query first!");
-            return;
-        }
+    function simulateRAG() {
+        const query = document.getElementById('userQuery').value;
+        if (vectorDatabase.length === 0) return alert("Add data first!");
 
-        document.getElementById('retrievalInfo').style.display = 'block';
-        
-        // Remove previous highlights
-        document.querySelectorAll('.chunk').forEach(el => el.classList.remove('highlight'));
+        document.getElementById('resultsArea').classList.remove('hidden');
+        document.querySelectorAll('.chunk-box').forEach(c => c.classList.remove('active-chunk'));
 
-        // SIMULATING SEMANTIC SEARCH
-        // In a real RAG, we compare query vector vs chunk vectors.
-        // Here, we'll simulate "closest distance" by looking for keyword matches.
-        let bestMatch = chunks[0];
+        // 3. Retrieval Step (Similarity Search)
+        // We simulate "Least Distance" by finding the chunk with most keyword matches
+        let winner = vectorDatabase[0];
         let maxScore = -1;
 
-        chunks.forEach(chunk => {
+        vectorDatabase.forEach(chunk => {
             let score = 0;
-            const queryWords = query.toLowerCase().split(' ');
-            queryWords.forEach(word => {
+            query.toLowerCase().split(' ').forEach(word => {
                 if (chunk.text.toLowerCase().includes(word)) score++;
             });
-
             if (score > maxScore) {
                 maxScore = score;
-                bestMatch = chunk;
+                winner = chunk;
             }
         });
 
-        // 1. Highlight the retrieved chunk
-        document.getElementById(`chunk-${bestMatch.id}`).classList.add('highlight');
-        document.getElementById('distanceMetric').innerHTML = `Found match in <b>Chunk ${bestMatch.id + 1}</b> (Highest semantic similarity).`;
+        // Highlight the "Retrieved" chunk
+        document.getElementById(`chunk-${winner.id}`).classList.add('active-chunk');
+        document.getElementById(`chunk-${winner.id}`).scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-        // 2. Augmentation Step
-        const systemPrompt = `You are a helpful assistant. Use the provided context to answer the question.\n\nCONTEXT:\n"${bestMatch.text}"\n\nQUESTION:\n${query}`;
-        document.getElementById('final-prompt-box').innerText = systemPrompt;
+        // 4. Augmentation Step
+        const augmentedPrompt = `System: Answer using ONLY the context.\nContext: ${winner.text}\nUser: ${query}`;
+        document.getElementById('promptOutput').innerText = augmentedPrompt;
 
-        // 3. Generation Step (Mock LLM)
-        document.getElementById('llmResponse').innerText = `Generating response... "Based on the provided context, ${bestMatch.text}"`;
+        // 5. Generation Step
+        setTimeout(() => {
+            document.getElementById('aiResponse').innerText = `Based on the retrieved records, ${winner.text.replace('.', '')}.`;
+        }, 500);
     }
 
-    // Initialize with default data
-    processData();
+    // Initial load
+    processIngestion();
 </script>
 
 </body>
