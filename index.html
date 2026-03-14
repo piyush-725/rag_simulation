@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive RAG Simulator</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --secondary: #ec4899;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 { color: var(--primary); margin-bottom: 10px; }
+        p.subtitle { color: #64748b; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            border: 1px solid var(--border);
+        }
+
+        h2 { font-size: 1.2rem; margin-top: 0; display: flex; align-items: center; gap: 10px; }
+        
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            resize: none;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        button {
+            margin-top: 10px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+
+        button:hover { opacity: 0.9; }
+
+        .chunk-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .chunk {
+            background: #f1f5f9;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            border-left: 4px solid var(--primary);
+            width: 100%;
+        }
+
+        .vector-tag {
+            font-family: monospace;
+            color: var(--secondary);
+            font-size: 0.75rem;
+            display: block;
+            margin-top: 4px;
+        }
+
+        .status-badge {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            padding: 2px 6px;
+            background: #dcfce7;
+            color: #166534;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .highlight {
+            border: 2px solid var(--secondary) !important;
+            background: #fdf2f8 !important;
+        }
+
+        #final-prompt-box {
+            white-space: pre-wrap;
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            margin-top: 15px;
+        }
+
+        .step-label {
+            font-weight: bold;
+            color: var(--secondary);
+            margin-bottom: 5px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>RAG Simulator</h1>
+        <p class="subtitle">Understand Retrieval, Augmentation, and Generation interactively.</p>
+    </header>
+
+    <div class="grid">
+        <div class="card">
+            <h2>1. Data & Chunking</h2>
+            <p style="font-size: 0.85rem; color: #64748b;">Enter text to simulate "PDF/Website" ingestion.</p>
+            <textarea id="dataInput">The Golden Retriever is a sturdy, muscular dog of medium size. They are famous for the dense, lustrous coat of gold that gives the breed its name. Labrador Retrievers are friendly, active, and outgoing. They have more than enough affection to go around for a family looking for a medium-to-large dog.</textarea>
+            <button onclick="processData()">Chunk & Vectorize</button>
+            
+            <div id="chunkDisplay" class="chunk-container">
+                </div>
+        </div>
+
+        <div class="card">
+            <h2>2. Retrieval (Query)</h2>
+            <p style="font-size: 0.85rem; color: #64748b;">Ask a question to see "Vector Distance" in action.</p>
+            <input type="text" id="queryInput" placeholder="e.g. Tell me about Golden Retrievers">
+            <button onclick="runQuery()" style="background: var(--secondary);">Search Vector DB</button>
+
+            <div id="retrievalInfo" style="margin-top: 20px; display: none;">
+                <span class="step-label">Step: Retrieval</span>
+                <p id="distanceMetric" style="font-size: 0.85rem;"></p>
+                
+                <span class="step-label">Step: Augmentation (The Prompt)</span>
+                <div id="final-prompt-box"></div>
+
+                <span class="step-label" style="margin-top: 15px;">Step: Generation (Simulated)</span>
+                <p id="llmResponse" style="font-style: italic; color: var(--primary); font-weight: 500;"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let chunks = [];
+
+    // Simple "Vector" simulator: Returns a set of keywords as a proxy for a vector
+    function getSimulatedVector(text) {
+        return Array.from({length: 4}, () => (Math.random()).toFixed(2));
+    }
+
+    function processData() {
+        const text = document.getElementById('dataInput').value;
+        const chunkDisplay = document.getElementById('chunkDisplay');
+        chunkDisplay.innerHTML = '';
+        chunks = [];
+
+        // Simple Chunking: Split by sentences
+        const sentenceArray = text.split(/[.!?]/).filter(s => s.trim().length > 0);
+
+        sentenceArray.forEach((s, index) => {
+            const vector = getSimulatedVector(s);
+            const chunkObj = {
+                id: index,
+                text: s.trim() + '.',
+                vector: vector
+            };
+            chunks.push(chunkObj);
+
+            const div = document.createElement('div');
+            div.className = 'chunk';
+            div.id = `chunk-${index}`;
+            div.innerHTML = `
+                <strong>Chunk ${index + 1}:</strong> ${chunkObj.text}
+                <span class="vector-tag">Vector: [${vector.join(', ')}]</span>
+            `;
+            chunkDisplay.appendChild(div);
+        });
+    }
+
+    function runQuery() {
+        const query = document.getElementById('queryInput').value;
+        if (!query || chunks.length === 0) {
+            alert("Please add data and enter a query first!");
+            return;
+        }
+
+        document.getElementById('retrievalInfo').style.display = 'block';
+        
+        // Remove previous highlights
+        document.querySelectorAll('.chunk').forEach(el => el.classList.remove('highlight'));
+
+        // SIMULATING SEMANTIC SEARCH
+        // In a real RAG, we compare query vector vs chunk vectors.
+        // Here, we'll simulate "closest distance" by looking for keyword matches.
+        let bestMatch = chunks[0];
+        let maxScore = -1;
+
+        chunks.forEach(chunk => {
+            let score = 0;
+            const queryWords = query.toLowerCase().split(' ');
+            queryWords.forEach(word => {
+                if (chunk.text.toLowerCase().includes(word)) score++;
+            });
+
+            if (score > maxScore) {
+                maxScore = score;
+                bestMatch = chunk;
+            }
+        });
+
+        // 1. Highlight the retrieved chunk
+        document.getElementById(`chunk-${bestMatch.id}`).classList.add('highlight');
+        document.getElementById('distanceMetric').innerHTML = `Found match in <b>Chunk ${bestMatch.id + 1}</b> (Highest semantic similarity).`;
+
+        // 2. Augmentation Step
+        const systemPrompt = `You are a helpful assistant. Use the provided context to answer the question.\n\nCONTEXT:\n"${bestMatch.text}"\n\nQUESTION:\n${query}`;
+        document.getElementById('final-prompt-box').innerText = systemPrompt;
+
+        // 3. Generation Step (Mock LLM)
+        document.getElementById('llmResponse').innerText = `Generating response... "Based on the provided context, ${bestMatch.text}"`;
+    }
+
+    // Initialize with default data
+    processData();
+</script>
+
+</body>
+</html>
