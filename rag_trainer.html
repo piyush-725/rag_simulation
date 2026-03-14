@@ -1,0 +1,972 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- gpt convo: https://chatgpt.com/c/68f729ef-601c-8321-8b55-1d12347d95b4 -->
+
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RAG Visualizer • HelloPM</title>
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- jQuery CDN -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+  <!-- Favicon (optional) -->
+  <link rel="icon" href="data:," />
+  <style>
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { height: 6px; width: 6px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    
+    /* Chunk styling */
+    .chunk-span { 
+      transition: all 200ms ease;
+      margin-bottom: 8px !important;
+      padding: 8px 12px !important;
+      border-radius: 8px;
+      display: inline-block;
+      cursor: pointer;
+      width: 100%;
+      margin-bottom: 1rem !important;
+    }
+    .chunk-span:hover { 
+      transform: translateY(-2px); 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+    }
+    
+    /* Typography */
+    .mono { font-variant-ligatures: none; font-feature-settings: "liga" 0; }
+    .spark { height: 24px; width: 120px; }
+    .badge { font-size: 0.75rem; }
+    .anchor-link { text-decoration: underline; text-underline-offset: 2px; }
+    
+    /* Progress indicator */
+    .step-indicator {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid #e2e8f0;
+    }
+    
+    /* Animations */
+    .fade-in { animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .slide-in { animation: slideIn 0.4s ease-out; }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+    
+    /* Step completion */
+    .step-completed { background: linear-gradient(135deg, #10b981, #059669); }
+    .step-active { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    .step-pending { background: #e2e8f0; }
+    
+    /* Results highlight */
+    .result-highlight { 
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+      border-left: 4px solid #f59e0b;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 text-slate-900 min-h-screen">
+  <!-- Progress Indicator -->
+  <div class="step-indicator">
+    <div class="max-w-7xl mx-auto px-4 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-full step-pending flex items-center justify-center text-white text-sm font-semibold" id="step-1">1</div>
+          <span class="text-sm font-medium text-slate-600">Chunk</span>
+        </div>
+        <div class="flex-1 h-1 mx-4 bg-slate-200 rounded-full">
+          <div class="h-full bg-slate-200 rounded-full transition-all duration-500" id="progress-bar"></div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-full step-pending flex items-center justify-center text-white text-sm font-semibold" id="step-2">2</div>
+          <span class="text-sm font-medium text-slate-600">Embed</span>
+        </div>
+        <div class="flex-1 h-1 mx-4 bg-slate-200 rounded-full">
+          <div class="h-full bg-slate-200 rounded-full transition-all duration-500"></div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-full step-pending flex items-center justify-center text-white text-sm font-semibold" id="step-3">3</div>
+          <span class="text-sm font-medium text-slate-600">Save</span>
+        </div>
+        <div class="flex-1 h-1 mx-4 bg-slate-200 rounded-full">
+          <div class="h-full bg-slate-200 rounded-full transition-all duration-500"></div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-full step-pending flex items-center justify-center text-white text-sm font-semibold" id="step-4">4</div>
+          <span class="text-sm font-medium text-slate-600">Query</span>
+        </div>
+        <div class="flex-1 h-1 mx-4 bg-slate-200 rounded-full">
+          <div class="h-full bg-slate-200 rounded-full transition-all duration-500"></div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-full step-pending flex items-center justify-center text-white text-sm font-semibold" id="step-5">5</div>
+          <span class="text-sm font-medium text-slate-600">Answer</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto p-4 md:p-8">
+    <!-- Header with HelloPM Logo -->
+    <header class="mb-8 text-center">
+      <div class="flex items-center justify-center mb-4">
+        <img src="https://hellopm.co/wp-content/uploads/2025/07/Frame-11-9.png" class=" h-16 w-auto inline-block">
+      </div>
+      <h1 class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+        RAG Process Visualizer
+      </h1>
+      <p class="text-base text-slate-600 mt-2 max-w-2xl mx-auto">
+        Interactive demonstration of Retrieval-Augmented Generation pipeline. 
+        Process your documents through chunking, embedding, and intelligent querying.
+      </p>
+    </header>
+
+    <!-- Main Workflow -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+      <!-- Left Panel: Input & Processing -->
+      <div class="xl:col-span-2 space-y-6">
+        <!-- Step 1: Document Input -->
+        <div class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+          <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-slate-200">
+            <h2 class="text-xl font-semibold text-slate-800 flex items-center">
+              <div class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">1</div>
+              Document Input & Chunking
+            </h2>
+            <p class="text-sm text-slate-600 mt-1">Upload your document and configure chunking parameters</p>
+          </div>
+          <div class="p-6">
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Paste your document content</label>
+                <textarea id="sourceText" class="w-full h-48 p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-none" placeholder="Paste your document content here (articles, handbooks, FAQs, transcripts, etc.)"></textarea>
+                <div class="flex justify-between items-center mt-2">
+                  <span class="text-xs text-slate-500">Minimum 40 characters recommended</span>
+                  <span id="charCount" class="text-xs text-slate-500">0 characters</span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-2">Chunk Size</label>
+                  <input id="chunkSize" type="number" min="40" value="350" class="w-full p-3 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                  <p class="text-xs text-slate-500 mt-1">Characters per chunk</p>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-2">Overlap</label>
+                  <input id="chunkOverlap" type="number" min="0" value="80" class="w-full p-3 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                  <p class="text-xs text-slate-500 mt-1">Characters overlap between chunks</p>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap gap-3 pt-4">
+                <button id="btnChunk" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl font-medium">
+                  <span class="flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                    </svg>
+                    Chunk Document
+                  </span>
+                </button>
+                <button id="btnEmbed" class="px-6 py-3 bg-gradient-to-r from-sky-600 to-cyan-600 text-white rounded-xl hover:from-sky-700 hover:to-cyan-700 transition-all duration-200 shadow-lg hover:shadow-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                  <span class="flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    Create Embeddings
+                  </span>
+                </button>
+                <button id="btnSaveDB" class="px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl hover:from-emerald-700 hover:to-green-700 transition-all duration-200 shadow-lg hover:shadow-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                  <span class="flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                    Save to Vector DB
+                  </span>
+                </button>
+                <div id="saveToast" class="hidden flex items-center px-4 py-2 bg-emerald-100 text-emerald-700 rounded-lg">
+                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                  Saved to localStorage
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Query Interface -->
+        <div class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+          <div class="bg-gradient-to-r from-amber-50 to-orange-50 px-6 py-4 border-b border-slate-200">
+            <h2 class="text-xl font-semibold text-slate-800 flex items-center">
+              <div class="w-8 h-8 bg-amber-600 text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">2</div>
+              Query & Retrieval
+            </h2>
+            <p class="text-sm text-slate-600 mt-1">Ask questions about your document content</p>
+          </div>
+          <div class="p-6">
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Enter your question</label>
+                <textarea id="userQuery" class="w-full h-24 p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all resize-none" placeholder="What are the key points mentioned in the document?"></textarea>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-2">Retrieve Top N</label>
+                  <select id="topN" class="w-full p-3 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all">
+                    <option value="1">1 chunk</option>
+                    <option value="3" selected>3 chunks</option>
+                    <option value="5">5 chunks</option>
+                    <option value="8">8 chunks</option>
+                    <option value="10">10 chunks</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-slate-700 mb-2">Answer Mode</label>
+                  <select id="answerMode" class="w-full p-3 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all">
+                    <option value="offline" selected>Offline (Extractive)</option>
+                    <option value="openai">OpenAI (Generative)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div id="openAIBlock" class="hidden p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <label class="block text-sm font-medium text-slate-700 mb-2">OpenAI API Key</label>
+                <input id="openAIKey" type="password" placeholder="sk-..." class="w-full p-3 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" />
+                <p class="text-xs text-slate-500 mt-2">Note: Runs client-side; CORS or org policies may block requests. If so, use Offline mode.</p>
+              </div>
+
+              <div class="flex flex-wrap gap-3 pt-4">
+                <button id="btnSearch" class="px-6 py-3 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-xl hover:from-amber-700 hover:to-orange-700 transition-all duration-200 shadow-lg hover:shadow-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                  <span class="flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    Retrieve Relevant Chunks
+                  </span>
+                </button>
+                <button id="btnCompose" class="px-6 py-3 bg-gradient-to-r from-slate-600 to-gray-700 text-white rounded-xl hover:from-slate-700 hover:to-gray-800 transition-all duration-200 shadow-lg hover:shadow-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                  <span class="flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                    Compose Query
+                  </span>
+                </button>
+                <button id="btnAskLLM" class="px-6 py-3 bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white rounded-xl hover:from-fuchsia-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                  <span class="flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    </svg>
+                    Generate Answer
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Results & Status -->
+      <div class="space-y-6">
+        <!-- Quick Status -->
+        <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
+          <h3 class="text-lg font-semibold text-slate-800 mb-4">Process Status</h3>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-slate-600">Document Chunked</span>
+              <div id="status-chunked" class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center">
+                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </div>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-slate-600">Embeddings Created</span>
+              <div id="status-embedded" class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center">
+                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </div>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-slate-600">Vector DB Ready</span>
+              <div id="status-saved" class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center">
+                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Results Preview -->
+        <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
+          <h3 class="text-lg font-semibold text-slate-800 mb-4">Retrieval Results</h3>
+          <div id="results" class="space-y-3">
+            <div class="text-center text-slate-500 py-8">
+              <svg class="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              <p class="text-sm">No results yet. Complete the setup steps to begin querying.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Section -->
+    <div class="mt-8 space-y-6">
+      <!-- Document Chunks Visualization -->
+      <div class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+        <div class="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-slate-200">
+          <h2 class="text-xl font-semibold text-slate-800 flex items-center">
+            <svg class="w-6 h-6 mr-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+            </svg>
+            Document Chunks
+          </h2>
+          <p class="text-sm text-slate-600 mt-1">Visual representation of your document chunks. Click on chunks from results to jump to them.</p>
+        </div>
+        <div id="chunkedView" class="p-6 min-h-32 whitespace-pre-wrap leading-relaxed bg-slate-50">
+          <div class="text-center text-slate-500 py-8">
+            <svg class="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <p class="text-sm">No chunks created yet. Start by pasting your document and clicking "Chunk Document".</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Embeddings & Results Grid -->
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <!-- Embeddings Table -->
+        <div class="xl:col-span-2 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+          <div class="bg-gradient-to-r from-purple-50 to-violet-50 px-6 py-4 border-b border-slate-200">
+            <h2 class="text-xl font-semibold text-slate-800 flex items-center">
+              <svg class="w-6 h-6 mr-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+              Embeddings & Metadata
+            </h2>
+            <p class="text-sm text-slate-600 mt-1">Vector representations of your document chunks</p>
+          </div>
+          <div id="embeddingTable" class="p-6">
+            <div class="text-center text-slate-500 py-8">
+              <svg class="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              </svg>
+              <p class="text-sm">No embeddings created yet. Create embeddings after chunking your document.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Retrieval Results -->
+        <div class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+          <div class="bg-gradient-to-r from-orange-50 to-red-50 px-6 py-4 border-b border-slate-200">
+            <h2 class="text-xl font-semibold text-slate-800 flex items-center">
+              <svg class="w-6 h-6 mr-3 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              Retrieval Results
+            </h2>
+            <p class="text-sm text-slate-600 mt-1">Most relevant chunks for your query</p>
+          </div>
+          <div id="results" class="p-6">
+            <div class="text-center text-slate-500 py-8">
+              <svg class="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              <p class="text-sm">No results yet. Complete the setup and run a query to see results.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Final Query & Answer -->
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <!-- Composed Query -->
+        <div class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+          <div class="bg-gradient-to-r from-slate-50 to-gray-50 px-6 py-4 border-b border-slate-200">
+            <h2 class="text-xl font-semibold text-slate-800 flex items-center">
+              <svg class="w-6 h-6 mr-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+              </svg>
+              Composed Query
+            </h2>
+            <p class="text-sm text-slate-600 mt-1">Final prompt sent to the LLM with context</p>
+          </div>
+          <div class="p-6">
+            <pre id="finalQuery" class="text-sm mono bg-slate-50 p-4 rounded-lg border border-slate-200 overflow-auto max-h-64 whitespace-pre-wrap"></pre>
+          </div>
+        </div>
+
+        <!-- LLM Answer -->
+        <div class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+          <div class="bg-gradient-to-r from-fuchsia-50 to-purple-50 px-6 py-4 border-b border-slate-200">
+            <div class="flex items-center justify-between">
+              <h2 class="text-xl font-semibold text-slate-800 flex items-center">
+                <svg class="w-6 h-6 mr-3 text-fuchsia-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                </svg>
+                AI Answer
+              </h2>
+              <div id="answerMeta" class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full"></div>
+            </div>
+            <p class="text-sm text-slate-600 mt-1">Generated response based on your document</p>
+          </div>
+          <div class="p-6">
+            <div id="answer" class="prose prose-slate max-w-none">
+              <div class="text-center text-slate-500 py-8">
+                <svg class="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                </svg>
+                <p class="text-sm">No answer generated yet. Complete the workflow to get an AI response.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="text-center text-xs text-slate-500 py-8">Demo for teaching RAG. Built with jQuery + Tailwind. Data stays in your browser.</footer>
+  </div>
+
+  <script>
+    // ----------------------------
+    // Utilities
+    // ----------------------------
+    const colorScale = [
+      'bg-rose-50 ring-rose-200', 'bg-orange-50 ring-orange-200', 'bg-amber-50 ring-amber-200',
+      'bg-lime-50 ring-lime-200', 'bg-emerald-50 ring-emerald-200', 'bg-teal-50 ring-teal-200',
+      'bg-cyan-50 ring-cyan-200', 'bg-sky-50 ring-sky-200', 'bg-indigo-50 ring-indigo-200',
+      'bg-violet-50 ring-violet-200', 'bg-fuchsia-50 ring-fuchsia-200', 'bg-pink-50 ring-pink-200'
+    ];
+
+    function tokenize(text) {
+      return text
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(Boolean);
+    }
+
+    function unique(arr) { return [...new Set(arr)]; }
+
+    function cosine(a, b) {
+      let dot = 0, an = 0, bn = 0;
+      const len = Math.min(a.length, b.length);
+      for (let i = 0; i < len; i++) {
+        dot += a[i] * b[i];
+        an += a[i] * a[i];
+        bn += b[i] * b[i];
+      }
+      return (an && bn) ? (dot / (Math.sqrt(an) * Math.sqrt(bn))) : 0;
+    }
+
+    function drawSparkline(canvas, vec) {
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+      ctx.clearRect(0,0,w,h);
+      // scale to 0..1
+      const max = Math.max(...vec.map(v => Math.abs(v)), 1e-6);
+      const step = Math.max(1, Math.floor(vec.length / w));
+      ctx.beginPath();
+      for (let x = 0; x < w; x++) {
+        const idx = Math.min(vec.length - 1, x * step);
+        const val = vec[idx] / max; // -1..1
+        const y = h/2 - val * (h/2 - 2);
+        if (x === 0) ctx.moveTo(0, y); else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      // midline
+      ctx.beginPath();
+      ctx.moveTo(0, h/2); ctx.lineTo(w, h/2);
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.stroke();
+    }
+
+    // ----------------------------
+    // State
+    // ----------------------------
+    let chunks = []; // { id, start, end, text }
+    let vocab = []; // array of tokens
+    let idf = {};   // token -> idf
+    let vectors = []; // { id, vector: Float64Array, topTerms: [token,...] }
+
+    // ----------------------------
+    // Chunking
+    // ----------------------------
+    function chunkText(text, size, overlap) {
+      const spans = [];
+      const stride = Math.max(1, size - overlap);
+      let i = 0, id = 0;
+      while (i < text.length) {
+        const start = i;
+        const end = Math.min(text.length, i + size);
+        spans.push({ id, start, end, text: text.slice(start, end) });
+        id++; i += stride;
+        if (stride <= 0) break; // safety
+      }
+      return spans;
+    }
+
+    function renderChunks() {
+      const container = $('#chunkedView');
+      container.empty();
+      if (!chunks.length) { container.text('No chunks yet.'); return; }
+      const frag = document.createDocumentFragment();
+      chunks.forEach(ch => {
+        const color = colorScale[ch.id % colorScale.length];
+        const span = document.createElement('span');
+        span.id = `chunk-${ch.id}`;
+        span.className = `chunk-span ${color} ring-1 rounded-md px-1.5 py-0.5 mr-1 mb-1 inline-block`;
+        span.title = `Chunk #${ch.id} [${ch.start}-${ch.end}]`;
+        span.textContent = ch.text;
+        frag.appendChild(span);
+        frag.appendChild(document.createTextNode(' '));
+      });
+      container[0].appendChild(frag);
+    }
+
+    // ----------------------------
+    // Embeddings (TF-IDF demo)
+    // ----------------------------
+    function buildTfIdf() {
+      const docsTokens = chunks.map(c => tokenize(c.text));
+      const all = unique(docsTokens.flat());
+      vocab = all;
+      const N = chunks.length;
+      const df = {}; // token -> doc freq
+      docsTokens.forEach(tokens => {
+        unique(tokens).forEach(t => { df[t] = (df[t] || 0) + 1; });
+      });
+      idf = {};
+      all.forEach(t => { idf[t] = Math.log((N + 1) / ((df[t] || 0) + 1)) + 1; });
+
+      vectors = docsTokens.map((tokens, idx) => {
+        const tf = {};
+        tokens.forEach(t => { tf[t] = (tf[t] || 0) + 1; });
+        const vec = new Float64Array(vocab.length);
+        vocab.forEach((t, i) => { vec[i] = (tf[t] ? (tf[t] / tokens.length) : 0) * (idf[t] || 0); });
+        // top terms
+        const scored = Object.keys(tf).map(t => ({ t, s: (tf[t]/tokens.length) * (idf[t]||0) }));
+        scored.sort((a,b) => b.s - a.s);
+        const topTerms = scored.slice(0,6).map(o => o.t);
+        return { id: chunks[idx].id, vector: vec, topTerms };
+      });
+    }
+
+    function renderEmbeddingTable() {
+      const root = $('#embeddingTable');
+      root.empty();
+      if (!vectors.length) { root.html('<div class="text-slate-500 text-sm">No embeddings yet.</div>'); return; }
+
+      const table = $('<table class="min-w-full text-sm">');
+      const thead = (
+        '<thead><tr class="text-left border-b border-slate-200">\
+          <th class="py-2 pr-4">Chunk</th>\
+          <th class="py-2 pr-4">Top terms</th>\
+          <th class="py-2 pr-4">Dims</th>\
+          <th class="py-2 pr-4">Spark</th>\
+        </tr></thead>'
+      );
+      table.append(thead);
+
+      const tbody = $('<tbody>');
+      vectors.forEach(v => {
+        const tr = $('<tr class="border-b border-slate-100">');
+        tr.append(`<td class="py-2 pr-4">#${v.id} <a class="anchor-link text-indigo-600" href="#chunk-${v.id}">jump</a></td>`);
+        tr.append(`<td class="py-2 pr-4 text-slate-700">${v.topTerms.join(', ')}</td>`);
+        tr.append(`<td class="py-2 pr-4 text-slate-500">${v.vector.length}</td>`);
+        const spark = $(`<td class="py-2 pr-4"><canvas class="spark" width="160" height="32"></canvas></td>`);
+        tbody.append(tr);
+        tr.append(spark);
+        table.append(tr);
+        // draw sparkline
+        const canvas = spark.find('canvas')[0];
+        drawSparkline(canvas, Array.from(v.vector).slice(0,256));
+      });
+      table.append(tbody);
+      root.append(table);
+    }
+
+    // ----------------------------
+    // Vector DB (localStorage)
+    // ----------------------------
+    function saveToDB() {
+      const payload = {
+        chunks, vocab, idf,
+        vectors: vectors.map(v => ({ id: v.id, vector: Array.from(v.vector), topTerms: v.topTerms }))
+      };
+      try {
+        localStorage.setItem('rag_vector_db', JSON.stringify(payload));
+        $('#saveToast').removeClass('hidden');
+        setTimeout(() => $('#saveToast').addClass('hidden'), 2000);
+      } catch (e) {
+        alert('Save failed. localStorage quota may be exceeded.');
+      }
+    }
+
+    function loadDB() {
+      const raw = localStorage.getItem('rag_vector_db');
+      if (!raw) return null;
+      try {
+        const obj = JSON.parse(raw);
+        return obj;
+      } catch { return null; }
+    }
+
+    // ----------------------------
+    // Retrieval
+    // ----------------------------
+    function queryToVector(q) {
+      const tokens = tokenize(q);
+      const tf = {};
+      tokens.forEach(t => { tf[t] = (tf[t] || 0) + 1; });
+      const vec = new Float64Array(vocab.length);
+      vocab.forEach((t, i) => {
+        const tfv = (tf[t] ? (tf[t] / tokens.length) : 0);
+        vec[i] = tfv * (idf[t] || 0);
+      });
+      return vec;
+    }
+
+    function retrieve(q, topK = 3) {
+      const db = loadDB();
+      if (!db) { alert('No vector DB found. Save chunks first.'); return []; }
+      // sync state with DB
+      chunks = db.chunks;
+      vocab = db.vocab;
+      idf = db.idf;
+      vectors = db.vectors.map(v => ({ id: v.id, vector: Float64Array.from(v.vector), topTerms: v.topTerms }));
+
+      const qv = queryToVector(q);
+      const scored = vectors.map(v => ({
+        id: v.id,
+        score: cosine(qv, v.vector),
+        start: chunks.find(c => c.id === v.id).start,
+        end: chunks.find(c => c.id === v.id).end,
+        text: chunks.find(c => c.id === v.id).text
+      }));
+      scored.sort((a,b) => b.score - a.score);
+      return scored.slice(0, topK);
+    }
+
+    function renderResults(list) {
+      const root = $('#results');
+      root.empty();
+      if (!list || !list.length) { root.html('<div class="text-slate-500 text-sm">No results yet.</div>'); return; }
+      list.forEach(item => {
+        const color = colorScale[item.id % colorScale.length];
+        const card = $(`
+          <div class="p-3 rounded-xl border border-slate-200 ${color}">
+            <div class="flex items-center justify-between">
+              <div class="text-sm font-semibold">Chunk #${item.id} <a href="#chunk-${item.id}" class="anchor-link text-indigo-700">view</a></div>
+              <div class="badge px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700">cos ${item.score.toFixed(3)}</div>
+            </div>
+            <div class="text-sm mt-1">${$('<div>').text(item.text).html()}</div>
+          </div>
+        `);
+        root.append(card);
+      });
+    }
+
+    // ----------------------------
+    // Compose Final Query
+    // ----------------------------
+    function composeFinalQuery(userQ, topChunks) {
+      const data = topChunks.map((c, i) => `[[chunk_${c.id}]]\n${c.text.trim()}`).join('\n\n');
+      return `Answer the following user query based only on the provided data.\nuser_query: ${userQ}\n\nData:\n${data}`;
+    }
+
+    // ----------------------------
+    // Offline Answer (extractive)
+    // ----------------------------
+    function offlineAnswer(userQ, topChunks) {
+      const qTokens = unique(tokenize(userQ)).slice(0, 8);
+      const highlights = [];
+      topChunks.forEach(c => {
+        // pick sentences that match any qTokens
+        const sentences = c.text.split(/(?<=[.!?])\s+/);
+        const matched = sentences.filter(s => qTokens.some(t => s.toLowerCase().includes(t)));
+        const pick = (matched[0] || sentences[0] || '').trim();
+        if (pick) highlights.push({ id: c.id, text: pick });
+      });
+      const answerText = highlights.length
+        ? highlights.map(h => `${h.text} <a class="anchor-link text-indigo-700" href="#chunk-${h.id}">[chunk ${h.id}]</a>`).join(' ')
+        : `No direct matches found in top chunks. Consider rephrasing the query or increasing Top N.`;
+      return answerText;
+    }
+
+    // ----------------------------
+    // OpenAI Answer (optional)
+    // ----------------------------
+    async function openAIAnswer(key, finalPrompt, citations) {
+      try {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${key}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: 'You are a helpful teaching assistant. Cite chunks inline like [chunk id] and never use outside knowledge.' },
+              { role: 'user', content: finalPrompt }
+            ],
+            temperature: 0.2,
+            max_tokens: 600
+          })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content || '(no content)';
+        // Replace [chunk_X] with anchors
+        const withLinks = content.replace(/\[chunk\s*(\d+)\]/gi, (m, id) => `<a class="anchor-link text-indigo-700" href="#chunk-${id}">[chunk ${id}]</a>`);
+        return withLinks;
+      } catch (e) {
+        return `OpenAI request failed in browser (CORS/org policy). Use Offline mode. Error: ${e.message}`;
+      }
+    }
+
+    // ----------------------------
+    // Progress Tracking
+    // ----------------------------
+    function updateProgress(step) {
+      // Update step indicators
+      for (let i = 1; i <= 5; i++) {
+        const stepEl = $(`#step-${i}`);
+        if (i < step) {
+          stepEl.removeClass('step-pending step-active').addClass('step-completed');
+          stepEl.html('<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>');
+        } else if (i === step) {
+          stepEl.removeClass('step-pending step-completed').addClass('step-active');
+          stepEl.text(i);
+        } else {
+          stepEl.removeClass('step-completed step-active').addClass('step-pending');
+          stepEl.text(i);
+        }
+      }
+      
+      // Update progress bar
+      const progress = ((step - 1) / 4) * 100;
+      $('#progress-bar').css('width', `${progress}%`).removeClass('bg-slate-200').addClass('bg-blue-500');
+    }
+    
+    function updateStatus(status, completed) {
+      const statusEl = $(`#status-${status}`);
+      
+      if (completed) {
+        statusEl.removeClass('bg-slate-200').addClass('bg-green-500');
+        statusEl.html('<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>');
+        statusEl.addClass('fade-in');
+      } else {
+        statusEl.removeClass('bg-green-500 fade-in').addClass('bg-slate-200');
+        statusEl.html('<svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>');
+      }
+    }
+    
+    function resetAllStatus() {
+      updateStatus('chunked', false);
+      updateStatus('embedded', false);
+      updateStatus('saved', false);
+    }
+
+    // ----------------------------
+    // Event Handlers
+    // ----------------------------
+    $(function() {
+      // Character counter
+      $('#sourceText').on('input', function() {
+        const count = $(this).val().length;
+        $('#charCount').text(`${count} characters`);
+        if (count >= 40) {
+          $('#charCount').removeClass('text-slate-500').addClass('text-green-600');
+        } else {
+          $('#charCount').removeClass('text-green-600').addClass('text-slate-500');
+        }
+      });
+
+      // Switch mode
+      $('#answerMode').on('change', function(){
+        if ($(this).val() === 'openai') {
+          $('#openAIBlock').removeClass('hidden').addClass('slide-in');
+        } else {
+          $('#openAIBlock').addClass('hidden');
+        }
+      });
+
+      // Chunk
+      $('#btnChunk').on('click', function(){
+        const text = $('#sourceText').val();
+        const size = Math.max(40, parseInt($('#chunkSize').val() || '350', 10));
+        const overlap = Math.max(0, parseInt($('#chunkOverlap').val() || '80', 10));
+        if (!text || text.trim().length < 40) { 
+          alert('Please paste longer source text (minimum 40 characters).'); 
+          return; 
+        }
+        
+        // Reset all status indicators
+        resetAllStatus();
+        
+        // Show loading state
+        $(this).prop('disabled', true).html('<span class="flex items-center"><svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Processing...</span>');
+        
+        setTimeout(() => {
+          chunks = chunkText(text, size, overlap);
+          renderChunks();
+          updateProgress(2);
+          updateStatus('chunked', true);
+          
+          $('#btnEmbed').prop('disabled', false).addClass('fade-in');
+          $('#btnSaveDB').prop('disabled', true);
+          $('#btnSearch').prop('disabled', true);
+          $('#btnCompose').prop('disabled', true);
+          $('#btnAskLLM').prop('disabled', true);
+          
+          // Reset button
+          $('#btnChunk').prop('disabled', false).html('<span class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>Chunk Document</span>');
+          
+          // Clear other sections
+          $('#embeddingTable').empty().append('<div class="text-center text-slate-500 py-8"><svg class="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg><p class="text-sm">Ready to create embeddings.</p></div>');
+          $('#results').empty();
+          $('#finalQuery').text('');
+          $('#answer').html('');
+          $('#answerMeta').text('');
+        }, 500);
+      });
+
+      // Embeddings
+      $('#btnEmbed').on('click', function(){
+        if (!chunks.length) { alert('Chunk text first.'); return; }
+        
+        // Show loading state
+        $(this).prop('disabled', true).html('<span class="flex items-center"><svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Creating...</span>');
+        
+        setTimeout(() => {
+          buildTfIdf();
+          renderEmbeddingTable();
+          updateProgress(3);
+          updateStatus('embedded', true);
+          
+          $('#btnSaveDB').prop('disabled', false).addClass('fade-in');
+          
+          // Reset button
+          $('#btnEmbed').prop('disabled', false).html('<span class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>Create Embeddings</span>');
+        }, 800);
+      });
+
+      // Save to DB
+      $('#btnSaveDB').on('click', function(){
+        if (!vectors.length) { alert('Create embeddings first.'); return; }
+        
+        // Show loading state
+        $(this).prop('disabled', true).html('<span class="flex items-center"><svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Saving...</span>');
+        
+        setTimeout(() => {
+          saveToDB();
+          updateProgress(4);
+          updateStatus('saved', true);
+          
+          $('#btnSearch').prop('disabled', false).addClass('fade-in');
+          
+          // Reset button
+          $('#btnSaveDB').prop('disabled', false).html('<span class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12"></path></svg>Save to Vector DB</span>');
+        }, 500);
+      });
+
+      // Retrieve
+      $('#btnSearch').on('click', function(){
+        const q = $('#userQuery').val();
+        if (!q.trim()) { alert('Enter a user prompt.'); return; }
+        
+        // Show loading state
+        $(this).prop('disabled', true).html('<span class="flex items-center"><svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Searching...</span>');
+        
+        setTimeout(() => {
+          const topK = parseInt($('#topN').val(), 10);
+          const hits = retrieve(q, topK);
+          renderResults(hits);
+          updateProgress(5);
+          
+          if (hits.length) {
+            $('#btnCompose').prop('disabled', false).addClass('fade-in');
+          }
+          
+          // Reset button
+          $('#btnSearch').prop('disabled', false).html('<span class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>Retrieve Relevant Chunks</span>');
+        }, 600);
+      });
+
+      // Compose final prompt
+      $('#btnCompose').on('click', function(){
+        const q = $('#userQuery').val();
+        const topK = parseInt($('#topN').val(), 10);
+        const hits = retrieve(q, topK);
+        const composed = composeFinalQuery(q, hits);
+        $('#finalQuery').text(composed).addClass('fade-in');
+        $('#btnAskLLM').prop('disabled', false).addClass('fade-in');
+      });
+
+      // Ask LLM
+      $('#btnAskLLM').on('click', async function(){
+        const mode = $('#answerMode').val();
+        const q = $('#userQuery').val();
+        const topK = parseInt($('#topN').val(), 10);
+        const hits = retrieve(q, topK);
+
+        // Show loading state
+        $(this).prop('disabled', true).html('<span class="flex items-center"><svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Generating...</span>');
+
+        $('#answerMeta').text(`Top N: ${topK} • Retrieved from local vector DB`);
+        $('#answer').html('<div class="flex items-center justify-center py-8"><svg class="animate-spin w-8 h-8 mr-3 text-blue-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span class="text-slate-600">Generating answer...</span></div>');
+
+        try {
+          let html;
+          if (mode === 'offline') {
+            html = offlineAnswer(q, hits);
+            $('#answer').html(`<div class="leading-7 fade-in">${html}</div>`);
+          } else if (mode === 'openai') {
+            const key = $('#openAIKey').val().trim();
+            if (!key) { 
+              alert('Enter OpenAI key or use Offline mode.'); 
+              $('#answer').html(''); 
+              return; 
+            }
+            const finalPrompt = $('#finalQuery').text();
+            html = await openAIAnswer(key, finalPrompt);
+            $('#answer').html(`<div class="leading-7 fade-in">${html}</div>`);
+          }
+        } catch (error) {
+          $('#answer').html(`<div class="text-red-600 fade-in">Error: ${error.message}</div>`);
+        } finally {
+          // Reset button
+          $('#btnAskLLM').prop('disabled', false).html('<span class="flex items-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>Generate Answer</span>');
+        }
+      });
+
+      // Initialize progress and status
+      updateProgress(1);
+      resetAllStatus();
+      
+      // If a DB exists, enable retrieval directly
+      if (loadDB()) {
+        $('#btnSearch').prop('disabled', false);
+        updateStatus('chunked', true);
+        updateStatus('embedded', true);
+        updateStatus('saved', true);
+        updateProgress(4);
+      }
+    });
+  </script>
+</body>
+</html>
